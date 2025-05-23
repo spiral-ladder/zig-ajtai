@@ -107,6 +107,7 @@ const RingModuloCfg = enum {
 ///
 /// All operations done within the ring are performed modulo a prime q and the cyclotomic polynomial X^D + 1.
 ///
+/// `C` - The configuration that decides the relationship between `F.q` and `E` for efficient NTTs
 /// `D` - The degree of the cyclotomic polynomial X^D + 1
 /// `E` - `E` is the parameter that ensures correct parameters for faster NTTs
 /// `F` - The `PrimeField` used for coefficients
@@ -114,7 +115,11 @@ const RingModuloCfg = enum {
 ///
 /// At compile-time, we check that:
 /// - D is a power of two
-/// - q ≡ 1 + 2e (mod 4e) for some e | d,
+/// - If `C` == `.Standard`, that
+///   - F.q ≡ 1 (mod 2E), or
+/// - If `C` == `.Strict`, that
+///   - F.q ≡ 1 + 2E (mod 4E).
+/// for some E | D.
 ///
 /// If q ≡ 1 + 2e (mod 4e), Rq ∼= F_{q^d/e}^e via the Number Theoretic Transform (NTT).
 ///
@@ -148,15 +153,10 @@ pub fn CyclotomicRing(
         const Self = @This();
 
         m: F.M,
-        // Store the primitive root value
 
         /// Initialises an instance of the `CyclotomicRing` with a `ff.Modulus`.
         pub fn init() Self {
             const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
-
-            // Calculate primitive root at initialization
-            // const psi_2n_value = findPrimitiveRoot(F, D) catch unreachable;
-            // const psi_2n = F.M.Fe.fromPrimitive(F.T, m, psi_2n_value) catch unreachable;
 
             return .{
                 .m = m,
