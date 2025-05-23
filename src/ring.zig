@@ -29,21 +29,6 @@ pub fn inv(comptime F: PrimeField, a: F.M.Fe) F.M.Fe {
     return result;
 }
 
-/// Computes a^exp mod p using binary exponentiation.
-pub fn powMod(comptime F: PrimeField, m: F.M, a: F.M.Fe, exp: usize) F.M.Fe {
-    var result = m.one();
-    var base = a;
-    var e = exp;
-
-    while (e > 0) {
-        if (e & 1 == 1) result = m.mul(result, base);
-        base = m.mul(base, base);
-        e >>= 1;
-    }
-
-    return result;
-}
-
 /// Finds a primitive 2n-th root of unity in the field.
 /// A primitive 2n-th root of unity ψ satisfies:
 /// - ψ^n ≡ -1 (mod q)
@@ -58,10 +43,10 @@ pub fn powMod(comptime F: PrimeField, m: F.M, a: F.M.Fe, exp: usize) F.M.Fe {
 pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
     @setEvalBranchQuota(100000);
     const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
-    const n = D; // The degree of the polynomial X^D + 1
+    const d_fe = try F.M.Fe.fromPrimitive(F.T, m, D); // The degree of the polynomial X^D + 1
     const candidates = [_]F.T{ 2, 3, 5, 7, 11, 13, 17, 19, 23 };
 
-    const exponent = (F.q - 1) / (2 * n);
+    const exponent = try F.M.Fe.fromPrimitive(F.T, m, (F.q - 1) / (2 * D));
 
     for (candidates) |candidate| {
         if (candidate >= F.q) continue;
@@ -70,10 +55,10 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
 
         // Compute element^((q-1)/(2n))
         // This should be a primitive 2n-th root of unity if element is a primitive root
-        const possible_root = powMod(F, m, element, exponent);
+        const possible_root = try m.pow(element, exponent);
 
         // Verify this is indeed a primitive 2n-th root by checking if its n-th power is -1
-        const powered = powMod(F, m, possible_root, n);
+        const powered = try m.pow(possible_root, d_fe);
         const neg_one = m.sub(m.zero, m.one());
 
         if (powered.eql(neg_one)) {
@@ -86,8 +71,8 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
     while (candidate < F.q) : (candidate += 1) {
         const element = F.M.Fe.fromPrimitive(F.T, m, candidate) catch unreachable;
 
-        const possible_root = powMod(F, m, element, exponent);
-        const powered = powMod(F, m, possible_root, n);
+        const possible_root = try m.pow(element, exponent);
+        const powered = try m.pow(possible_root, d_fe);
         const neg_one = m.sub(m.zero, m.one());
 
         if (powered.eql(neg_one)) {
@@ -582,13 +567,16 @@ test "primitive root finding" {
     const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
     const root_fe = F.M.Fe.fromPrimitive(F.T, m, root) catch unreachable;
 
+    const d = F.M.Fe.fromPrimitive(F.T, m, D) catch unreachable;
+    const powered = try m.pow(root_fe, d);
     // Check that root^D ≡ -1 (mod q)
-    const powered = powMod(F, m, root_fe, D);
     const neg_one = m.sub(m.zero, m.one());
     try std.testing.expect(powered.eql(neg_one));
 
     // Check that root^(2*D) ≡ 1 (mod q)
-    const powered_2d = powMod(F, m, root_fe, 2 * D);
+    const two = F.M.Fe.fromPrimitive(F.T, m, 2) catch unreachable;
+    const d2 = m.mul(d, two);
+    const powered_2d = try m.pow(root_fe, d2);
     try std.testing.expect(powered_2d.eql(m.one()));
 }
 
