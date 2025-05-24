@@ -136,7 +136,7 @@ pub fn CyclotomicRing(
     const rhs = (1 + 2 * E) % (4 * E);
     switch (C) {
         .Standard => if ((F.q - 1) % (2 * D) != 0) {
-            const str = std.fmt.comptimePrint("F.q is not congruent to 1 (mod 2E). F.q = {}, E = {}, remainder = {}\n", .{ F.q, E, (F.q - 1 % (2 * E)) });
+            const str = std.fmt.comptimePrint("F.q is not congruent to 1 (mod 2D). F.q = {}, D = {}, remainder = {}\n", .{ F.q, D, (F.q - 1 % (2 * D)) });
             @compileError(str);
         },
         .Strict => if (F.q % (4 * E) != ((1 + 2 * E) % (4 * E))) {
@@ -520,6 +520,56 @@ test "ring multiplication" {
         var coefficients_res: [8]u8 = [_]u8{ 15, 0, 0, 0, 2, 0, 4, 0 };
         try test_ring_multiplication(R, F, &coefficients_a, &coefficients_b, &coefficients_res);
     }
+}
+
+test "ring multiplication - kyber round 1 params" {
+    const q = 7681;
+    const T = u32;
+    const M = ff.Modulus(@bitSizeOf(T));
+    const F = PrimeField{ .M = M, .T = T, .q = q };
+    const D = 256;
+    const E = 256;
+
+    const m = comptime blk: {
+        @setEvalBranchQuota(100_000);
+        break :blk M.fromPrimitive(T, q) catch unreachable;
+    };
+    const P = comptime try M.Fe.fromPrimitive(T, m, try findPrimitiveRoot(F, D));
+    const R = CyclotomicRing(.Standard, D, E, F, P);
+
+    var a: [D]T = [_]T{0} ** D;
+    var b: [D]T = [_]T{0} ** D;
+    var prng = std.Random.DefaultPrng.init(blk: {
+        var seed: u64 = undefined;
+        try std.posix.getrandom(std.mem.asBytes(&seed));
+        break :blk seed;
+    });
+    const random = prng.random();
+
+    const max_fe = m.sub(m.zero, m.one());
+    const max = try max_fe.toPrimitive(T);
+    for (0..D) |i| {
+        const a_coeff = random.intRangeAtMost(T, 0, max);
+        a[i] = a_coeff;
+        const b_coeff = random.intRangeAtMost(T, 0, max);
+        b[i] = b_coeff;
+    }
+
+    const r = R.init();
+    const allocator = std.testing.allocator;
+    const a_poly = try r.elementFromSlice(allocator, &a);
+    const b_poly = try r.elementFromSlice(allocator, &b);
+
+    // i'm lazy so for now we pass the result of naive mul here, even though we already do it in
+    // `test_ring_multiplication`.
+    const expected = try r.naiveMul(allocator, a_poly, b_poly);
+    var expected_coeffs: [D]T = [_]T{0} ** D;
+
+    for (0..D) |i| {
+        expected_coeffs[i] = try expected.coefficients.items[i].toPrimitive(T);
+    }
+
+    try test_ring_multiplication(R, F, &a, &b, &expected_coeffs);
 }
 
 test "field element inverse" {
