@@ -41,13 +41,14 @@ pub fn inv(comptime F: PrimeField, a: F.M.Fe) F.M.Fe {
 /// - For efficient implementation, we search for a primitive D-th root of unity
 ///   in a way that ensures correct NTT/iNTT operations
 pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
-    @setEvalBranchQuota(100000);
+    @setEvalBranchQuota(20_000);
     const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
     const d_fe = try F.M.Fe.fromPrimitive(F.T, m, D); // The degree of the polynomial X^D + 1
     const candidates = [_]F.T{ 2, 3, 5, 7, 11, 13, 17, 19, 23 };
 
     const exponent = try F.M.Fe.fromPrimitive(F.T, m, (F.q - 1) / (2 * D));
 
+    const neg_one = m.sub(m.zero, m.one());
     for (candidates) |candidate| {
         if (candidate >= F.q) continue;
 
@@ -59,7 +60,6 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
 
         // Verify this is indeed a primitive 2n-th root by checking if its n-th power is -1
         const powered = try m.pow(possible_root, d_fe);
-        const neg_one = m.sub(m.zero, m.one());
 
         if (powered.eql(neg_one)) {
             return possible_root.toPrimitive(F.T) catch unreachable;
@@ -73,7 +73,6 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
 
         const possible_root = try m.pow(element, exponent);
         const powered = try m.pow(possible_root, d_fe);
-        const neg_one = m.sub(m.zero, m.one());
 
         if (powered.eql(neg_one)) {
             return possible_root.toPrimitive(F.T) catch unreachable;
@@ -243,6 +242,7 @@ pub fn CyclotomicRing(
                     tmp_coeffs.items[i + j] = self.m.add(tmp_coeffs.items[i + j], product);
                 }
             }
+
             for (0..n) |i| {
                 result_coeffs.items[i] = self.m.sub(tmp_coeffs.items[i], tmp_coeffs.items[i + n]);
             }

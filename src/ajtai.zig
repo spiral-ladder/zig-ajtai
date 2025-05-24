@@ -79,18 +79,19 @@ pub fn Ajtai(
 }
 
 test "setup and commit" {
-    const M = 16;
     const q = 17;
-    const F = PrimeField{ .M = ff.Modulus(8), .T = u8, .q = q };
+    const T = u8;
+    const F = PrimeField{ .M = ff.Modulus(@bitSizeOf(T)), .T = T, .q = q };
     const D = 8;
     const E = 8;
-    const K = 10;
+    const K = 16;
+    const M = 16;
     const allocator = std.testing.allocator;
     const m = comptime blk: {
-        @setEvalBranchQuota(10_000);
-        break :blk F.M.fromPrimitive(u8, q) catch unreachable;
+        @setEvalBranchQuota(100_000);
+        break :blk F.M.fromPrimitive(T, q) catch unreachable;
     };
-    const P = comptime try F.M.Fe.fromPrimitive(u8, m, try findPrimitiveRoot(F, D));
+    const P = comptime try F.M.Fe.fromPrimitive(T, m, try findPrimitiveRoot(F, D));
     const Ring = CyclotomicRing(.Standard, D, E, F, P);
     const ring = Ring.init();
 
@@ -105,7 +106,7 @@ test "setup and commit" {
     var message: [M]Ring.Element = undefined;
     defer for (0..M) |i| message[i].deinit();
     for (0..M) |i| {
-        var coefficients: [M]u8 = [_]u8{10} ** M;
+        var coefficients: [M]T = [_]T{10} ** M;
         message[i] = try ring.elementFromSlice(std.testing.allocator, &coefficients);
     }
 
