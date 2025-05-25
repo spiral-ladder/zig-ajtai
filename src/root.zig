@@ -1,4 +1,4 @@
 test {
-    _ = @import("ring.zig");
+    _ = @import("test_ring.zig");
     _ = @import("ajtai.zig");
 }
