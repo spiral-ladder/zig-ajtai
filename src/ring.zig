@@ -82,20 +82,6 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
     return error.CannotFindPrimitiveRoot;
 }
 
-pub fn RingElement(
-    comptime F: PrimeField,
-) type {
-    return struct {
-        const Self = @This();
-
-        coefficients: ArrayList(F.M.Fe),
-
-        pub fn deinit(self: Self) void {
-            self.coefficients.deinit();
-        }
-    };
-}
-
 const RingModuloCfg = enum {
     /// Ensures q ≡ 1 (mod 2D).
     Standard,
@@ -150,10 +136,18 @@ pub fn CyclotomicRing(
     }
 
     return struct {
-        pub const Element = RingElement(F);
+        pub const Element = RingElement;
         pub const T = F.T;
 
         const Self = @This();
+
+        const RingElement = struct {
+            coefficients: ArrayList(F.M.Fe),
+
+            pub fn deinit(self: RingElement) void {
+                self.coefficients.deinit();
+            }
+        };
 
         m: F.M,
 
