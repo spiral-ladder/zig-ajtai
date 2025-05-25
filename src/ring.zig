@@ -88,6 +88,7 @@ pub fn CyclotomicRing(
         ///
         /// Deinitialize with `Element.deinit`.
         pub fn elementFromSlice(self: Self, allocator: Allocator, slice: []F.T) !Element {
+            std.debug.assert(slice.len <= D); // largest coefficient must be of degree D - 1 or less
             var coefficients = ArrayList(F.M.Fe).initCapacity(allocator, slice.len) catch unreachable;
             errdefer coefficients.deinit();
             for (slice) |c| {

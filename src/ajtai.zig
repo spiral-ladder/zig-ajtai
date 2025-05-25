@@ -86,8 +86,8 @@ test "setup and commit" {
     const F = PrimeField{ .M = ff.Modulus(@bitSizeOf(T)), .T = T, .q = q };
     const D = 8;
     const E = 8;
-    const K = 16;
-    const M = 16;
+    const K = 8;
+    const M = 8;
     const allocator = std.testing.allocator;
     const m = comptime blk: {
         @setEvalBranchQuota(100_000);
