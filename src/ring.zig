@@ -236,11 +236,11 @@ pub fn CyclotomicRing(
 
             return .{ .coefficients = result_coeffs };
         }
-        pub fn generatePowers(
-            self: Self,
-            powers: []F.M.Fe,
-            multiplicant: F.M.Fe,
-        ) void {
+
+        /// Generate powers of ψ in bit-reversed order.
+        ///
+        /// Expects a pre-allocated slice `powers` to populate the powers generated.
+        fn generatePowers(self: Self, powers: []F.M.Fe, multiplicant: F.M.Fe) void {
             powers[0] = self.m.one();
             var prev_power = powers[0];
 
@@ -252,10 +252,10 @@ pub fn CyclotomicRing(
             }
         }
 
-        /// Represents element in negatively wrapped convolution-based NTT representation
-        /// using an NTT with the Cooley-Tukey butterfly.
+        /// Represents an `element` in negatively wrapped convolution-based NTT representation
+        /// using forward NTT with the Cooley-Tukey butterfly.
         ///
-        /// b = NTT^ψ(a) = NTT(ψ * a)
+        /// a_hat = NTT^ψ(a) = NTT(ψ * a)
         ///
         /// where omega = {ψ_2n}^2 mod q, and
         /// ψ = (1, {ψ_2n}, {ψ_2n}^2, ..., {ψ_2n}^{n-1})
@@ -263,7 +263,6 @@ pub fn CyclotomicRing(
             const psi_powers_rev = try allocator.alloc(F.M.Fe, element.coefficients.items.len);
             defer allocator.free(psi_powers_rev);
 
-            // Use the precomputed primitive root
             self.generatePowers(psi_powers_rev, P);
 
             try self.ct_ntt(allocator, element, psi_powers_rev);
