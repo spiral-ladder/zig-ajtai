@@ -16,7 +16,7 @@ pub fn Ajtai(
     const RandomMatrix = struct {
         const Self = @This();
 
-        /// The matrix is represented in memory in an array, instead of a 2D array `[K][M]Ring.Element`.
+        /// The matrix is represented in memory in a 1D array.
         inner: [K * M]Ring.Element,
 
         fn deinit(self: Self) void {
@@ -25,6 +25,8 @@ pub fn Ajtai(
                     self.inner[(k * M) + m].deinit();
         }
     };
+
+    const r = Ring.init();
 
     return struct {
         /// Creates a random K×M matrix where each entry is a ring element
@@ -35,7 +37,6 @@ pub fn Ajtai(
         pub fn setup(
             allocator: Allocator,
         ) !RandomMatrix {
-            const r = Ring.init();
             const max_fe = r.m.sub(r.m.zero, r.m.one());
             const max = try max_fe.toPrimitive(Ring.T);
             var matrix: [K * M]Ring.Element = undefined;
@@ -61,7 +62,6 @@ pub fn Ajtai(
             matrix: *RandomMatrix,
             message: *[M]Ring.Element,
         ) !Commitment {
-            const r = Ring.init();
             var commitment: [K]Ring.Element = undefined;
             var slice: [K]Ring.T = [_]Ring.T{0} ** K;
             for (0..K) |k| commitment[k] = try r.elementFromSlice(allocator, &slice);
