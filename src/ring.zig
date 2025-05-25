@@ -186,8 +186,12 @@ pub fn CyclotomicRing(
             a: *Element,
             b: *Element,
         ) !Element {
-            try self.nwc_ntt(allocator, a);
-            try self.nwc_ntt(allocator, b);
+            const psi_powers_rev = try allocator.alloc(F.M.Fe, a.coefficients.items.len);
+            defer allocator.free(psi_powers_rev);
+            self.generatePowers(psi_powers_rev, P);
+
+            try self.nwc_ntt(a, psi_powers_rev);
+            try self.nwc_ntt(b, psi_powers_rev);
 
             var res = try ArrayList(F.M.Fe).initCapacity(allocator, a.coefficients.items.len);
             errdefer res.deinit();
@@ -199,7 +203,12 @@ pub fn CyclotomicRing(
 
             var result = Element{ .coefficients = res };
 
-            try self.nwc_intt(allocator, &result);
+            // Reuse the same buffer used for forward NTT's psis to store
+            // inverse NTT's psi inverses.
+            const psi_powers_inv_rev = psi_powers_rev;
+            const psi_2n_inv = inv(F, P);
+            self.generatePowers(psi_powers_inv_rev, psi_2n_inv);
+            try self.nwc_intt(&result, psi_powers_inv_rev);
 
             return result;
         }
@@ -259,13 +268,8 @@ pub fn CyclotomicRing(
         ///
         /// where omega = {ψ_2n}^2 mod q, and
         /// ψ = (1, {ψ_2n}, {ψ_2n}^2, ..., {ψ_2n}^{n-1})
-        pub fn nwc_ntt(self: Self, allocator: Allocator, element: *Element) !void {
-            const psi_powers_rev = try allocator.alloc(F.M.Fe, element.coefficients.items.len);
-            defer allocator.free(psi_powers_rev);
-
-            self.generatePowers(psi_powers_rev, P);
-
-            try self.ct_ntt(element, psi_powers_rev);
+        pub fn nwc_ntt(self: Self, element: *Element, psis_brv: []const F.M.Fe) !void {
+            try self.ct_ntt(element, psis_brv);
         }
 
         /// Transforms an `element` in the NTT representation back to standard representation
@@ -275,20 +279,11 @@ pub fn CyclotomicRing(
         ///
         /// where omega = {ψ_2n}^2 mod q, and
         /// ψ^-1 = (1, {ψ_2n}^-1, {ψ_2n}^-2, ..., {ψ_2n}^-{n-1})
-        pub fn nwc_intt(self: Self, allocator: Allocator, element: *Element) !void {
-            const n = element.coefficients.items.len;
-
-            const psi_powers_inv_rev = try allocator.alloc(F.M.Fe, n);
-            defer allocator.free(psi_powers_inv_rev);
-
-            // Use the precomputed primitive root and calculate its inverse
-            const psi_2n_inv = inv(F, P);
-            self.generatePowers(psi_powers_inv_rev, psi_2n_inv);
-
-            try self.gs_intt(element, psi_powers_inv_rev);
+        pub fn nwc_intt(self: Self, element: *Element, psis_inverse_brv: []const F.M.Fe) !void {
+            try self.gs_intt(element, psis_inverse_brv);
 
             // Scale each coefficient by n^-1
-            const n_inv = inv(F, F.M.Fe.fromPrimitive(F.T, self.m, @intCast(n)) catch unreachable);
+            const n_inv = inv(F, F.M.Fe.fromPrimitive(F.T, self.m, @intCast(element.coefficients.items.len)) catch unreachable);
             for (element.coefficients.items) |*coeff| coeff.* = self.m.mul(coeff.*, n_inv);
         }
 
