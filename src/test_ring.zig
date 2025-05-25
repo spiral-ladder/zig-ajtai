@@ -1,3 +1,5 @@
+//! Contains tests for `CyclotomicRing` and other operations.
+
 fn test_ring_addition(
     comptime F: PrimeField,
     R: type,
@@ -181,64 +183,6 @@ test "ring multiplication - kyber round 1 params" {
     }
 
     try test_ring_multiplication(R, F, &a, &b, &expected_coeffs);
-}
-
-test "field element inverse" {
-    const M = ff.Modulus(8);
-    const F = PrimeField{ .M = M, .T = u8, .q = 17 };
-
-    const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
-
-    // Test inverses of all non-zero elements
-    for (1..17) |i| {
-        const a = F.M.Fe.fromPrimitive(F.T, m, @intCast(i)) catch unreachable;
-        const a_inv = inv(F, a);
-        const prod = m.mul(a, a_inv);
-        try std.testing.expectEqual(m.one(), prod);
-    }
-
-    // Test specific known inverses
-    const test_cases = [_]struct { actual: u8, expected: u8 }{
-        .{ .actual = 2, .expected = 9 }, // 2 * 9 = 18 ≡ 1 mod 17
-        .{ .actual = 3, .expected = 6 }, // 3 * 6 = 18 ≡ 1 mod 17
-        .{ .actual = 4, .expected = 13 }, // 4 * 13 = 52 ≡ 1 mod 17
-        .{ .actual = 5, .expected = 7 }, // 5 * 7 = 35 ≡ 1 mod 17
-        .{ .actual = 6, .expected = 3 }, // 6 * 3 = 18 ≡ 1 mod 17
-        .{ .actual = 7, .expected = 5 }, // 7 * 5 = 35 ≡ 1 mod 17
-        .{ .actual = 8, .expected = 15 }, // 8 * 15 = 120 ≡ 1 mod 17
-        .{ .actual = 9, .expected = 2 }, // 9 * 2 = 18 ≡ 1 mod 17
-    };
-
-    for (test_cases) |case| {
-        const a = F.M.Fe.fromPrimitive(F.T, m, case.actual) catch unreachable;
-        const a_inv = inv(F, a);
-        const expected = F.M.Fe.fromPrimitive(F.T, m, case.expected) catch unreachable;
-        try std.testing.expectEqual(expected, a_inv);
-    }
-}
-
-test "primitive root finding" {
-    const M = ff.Modulus(32);
-    const D = 8;
-    const q = 17;
-    const F = PrimeField{ .M = M, .T = u32, .q = q };
-
-    const root = try F.find2NPrimitiveRoot(D);
-
-    const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
-    const root_fe = F.M.Fe.fromPrimitive(F.T, m, root) catch unreachable;
-
-    const d = F.M.Fe.fromPrimitive(F.T, m, D) catch unreachable;
-    const powered = try m.pow(root_fe, d);
-    // Check that root^D ≡ -1 (mod q)
-    const neg_one = m.sub(m.zero, m.one());
-    try std.testing.expect(powered.eql(neg_one));
-
-    // Check that root^(2*D) ≡ 1 (mod q)
-    const two = F.M.Fe.fromPrimitive(F.T, m, 2) catch unreachable;
-    const d2 = m.mul(d, two);
-    const powered_2d = try m.pow(root_fe, d2);
-    try std.testing.expect(powered_2d.eql(m.one()));
 }
 
 const CyclotomicRing = ring.CyclotomicRing;
