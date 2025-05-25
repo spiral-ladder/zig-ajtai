@@ -265,13 +265,13 @@ pub fn CyclotomicRing(
 
             self.generatePowers(psi_powers_rev, P);
 
-            try self.ct_ntt(allocator, element, psi_powers_rev);
+            try self.ct_ntt(element, psi_powers_rev);
         }
 
         /// Transforms an `element` in the NTT representation back to standard representation
         /// using an inverse NTT with the Gentleman-Sande butterfly.
         ///
-        /// b = NTT^{ψ^-1}(a) = NTT(ψ^-1 * a)
+        /// a = NTT^{ψ^-1}(a_hat) = NTT(ψ^-1 * a_hat)
         ///
         /// where omega = {ψ_2n}^2 mod q, and
         /// ψ^-1 = (1, {ψ_2n}^-1, {ψ_2n}^-2, ..., {ψ_2n}^-{n-1})
@@ -285,7 +285,7 @@ pub fn CyclotomicRing(
             const psi_2n_inv = inv(F, P);
             self.generatePowers(psi_powers_inv_rev, psi_2n_inv);
 
-            try self.gs_intt(allocator, element, psi_powers_inv_rev);
+            try self.gs_intt(element, psi_powers_inv_rev);
 
             // Scale each coefficient by n^-1
             const n_inv = inv(F, F.M.Fe.fromPrimitive(F.T, self.m, @intCast(n)) catch unreachable);
@@ -303,11 +303,8 @@ pub fn CyclotomicRing(
         ///   B = a - ωb mod q
         ///
         /// Reference: Algorithm 1 in https://www.microsoft.com/en-us/research/wp-content/uploads/2016/05/RLWE-1.pdf
-        fn ct_ntt(self: Self, allocator: Allocator, element: *Element, psis: []const F.M.Fe) !void {
+        fn ct_ntt(self: Self, element: *Element, psis: []const F.M.Fe) !void {
             const n = element.coefficients.items.len;
-            var out = try std.ArrayList(F.M.Fe).initCapacity(allocator, n);
-            defer out.deinit();
-            try out.appendSlice(element.coefficients.items);
 
             var t: usize = n;
             var m: usize = 1;
@@ -319,15 +316,13 @@ pub fn CyclotomicRing(
                     const j_2 = j_1 + t - 1;
                     const s = psis[m + i];
                     for (j_1..j_2 + 1) |j| {
-                        const u = out.items[j];
-                        const v = self.m.mul(out.items[j + t], s);
+                        const u = element.coefficients.items[j];
+                        const v = self.m.mul(element.coefficients.items[j + t], s);
 
-                        out.items[j] = self.m.add(u, v);
-                        out.items[j + t] = self.m.sub(u, v);
+                        element.coefficients.items[j] = self.m.add(u, v);
+                        element.coefficients.items[j + t] = self.m.sub(u, v);
                     }
                 }
-
-                element.coefficients.replaceRangeAssumeCapacity(0, element.coefficients.items.len, out.items);
             }
         }
 
@@ -342,12 +337,8 @@ pub fn CyclotomicRing(
         ///   b = ω(A - B) mod q
         ///
         /// Reference: Algorithm 2 in https://www.microsoft.com/en-us/research/wp-content/uploads/2016/05/RLWE-1.pdf
-        fn gs_intt(self: Self, allocator: Allocator, element: *Element, psis_inverse: []const F.M.Fe) !void {
+        fn gs_intt(self: Self, element: *Element, psis_inverse: []const F.M.Fe) !void {
             const n = element.coefficients.items.len;
-
-            var out = try std.ArrayList(F.M.Fe).initCapacity(allocator, n);
-            defer out.deinit();
-            try out.appendSlice(element.coefficients.items);
 
             var t: usize = 1;
             var m: usize = n;
@@ -360,14 +351,13 @@ pub fn CyclotomicRing(
                     for (j_1..j_2 + 1) |j| {
                         const u = element.coefficients.items[j];
                         const v = element.coefficients.items[j + t];
-                        out.items[j] = self.m.add(u, v);
-                        out.items[j + t] = self.m.mul(self.m.sub(u, v), s);
+
+                        element.coefficients.items[j] = self.m.add(u, v);
+                        element.coefficients.items[j + t] = self.m.mul(self.m.sub(u, v), s);
                     }
                     j_1 += 2 * t;
                 }
                 t *= 2;
-
-                element.coefficients.replaceRangeAssumeCapacity(0, element.coefficients.items.len, out.items);
             }
         }
     };
@@ -541,11 +531,14 @@ test "ring multiplication - kyber round 1 params" {
     const r = R.init();
     const allocator = std.testing.allocator;
     const a_poly = try r.elementFromSlice(allocator, &a);
+    defer a_poly.deinit();
     const b_poly = try r.elementFromSlice(allocator, &b);
+    defer b_poly.deinit();
 
     // i'm lazy so for now we pass the result of naive mul here, even though we already do it in
     // `test_ring_multiplication`.
     const expected = try r.naiveMul(allocator, a_poly, b_poly);
+    defer expected.deinit();
     var expected_coeffs: [D]T = [_]T{0} ** D;
 
     for (0..D) |i| {
