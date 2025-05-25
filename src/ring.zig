@@ -82,7 +82,6 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
     return error.CannotFindPrimitiveRoot;
 }
 
-// Define RingElement as a separate type
 pub fn RingElement(
     comptime F: PrimeField,
 ) type {
@@ -98,7 +97,9 @@ pub fn RingElement(
 }
 
 const RingModuloCfg = enum {
+    /// Ensures q ≡ 1 (mod 2D).
     Standard,
+    /// Ensures q ≡ 1 + 2E (mod 4E) for some E | D.
     Strict,
 };
 
@@ -106,42 +107,45 @@ const RingModuloCfg = enum {
 ///
 /// All operations done within the ring are performed modulo a prime q and the cyclotomic polynomial X^D + 1.
 ///
-/// `C` - The configuration that decides the relationship between `F.q` and `E` for efficient NTTs
+/// `C` - The configuration that decides the relationship between `F.q` and `D` or `E` for efficient NTTs
 /// `D` - The degree of the cyclotomic polynomial X^D + 1
-/// `E` - `E` is the parameter that ensures correct parameters for faster NTTs
+/// `E` - `E` is the parameter that ensures correct parameters for faster NTTs in the stricter setting
 /// `F` - The `PrimeField` used for coefficients
 /// `P` - The primitive root of unity used for NTTs
 ///
 /// At compile-time, we check that:
-/// - D is a power of two
-/// - If `C` == `.Standard`, that
-///   - F.q ≡ 1 (mod 2E), or
-/// - If `C` == `.Strict`, that
-///   - F.q ≡ 1 + 2E (mod 4E).
-/// for some E | D.
-///
-/// If q ≡ 1 + 2e (mod 4e), Rq ∼= F_{q^d/e}^e via the Number Theoretic Transform (NTT).
+/// 1) D is a power of two
+/// 2) If `C` == `.Standard`, that
+///      a) F.q ≡ 1 (mod 2D), or
+///    If `C` == `.Strict`, that
+///      a) F.q ≡ 1 + 2E (mod 4E) for some E | D
+///         If q ≡ 1 + 2E (mod 4E), Rq ∼= F_{q^D/E}^E via the Number Theoretic Transform (NTT).
+///      b) E divides D
 ///
 /// These conditions ensure the existence of appropriate roots of unity for the negatively wrapped convolution-based NTT.
 pub fn CyclotomicRing(
     comptime C: RingModuloCfg,
     comptime D: u128,
-    comptime E: u128,
+    comptime E: ?u128,
     comptime F: PrimeField,
     comptime P: F.M.Fe,
 ) type {
     comptime std.debug.assert(std.math.isPowerOfTwo(D));
-    comptime std.debug.assert(D % E == 0);
-    const lhs = F.q % (4 * E);
-    const rhs = (1 + 2 * E) % (4 * E);
     switch (C) {
         .Standard => if ((F.q - 1) % (2 * D) != 0) {
             const str = std.fmt.comptimePrint("F.q is not congruent to 1 (mod 2D). F.q = {}, D = {}, remainder = {}\n", .{ F.q, D, (F.q - 1 % (2 * D)) });
             @compileError(str);
         },
-        .Strict => if (F.q % (4 * E) != ((1 + 2 * E) % (4 * E))) {
-            const str = std.fmt.comptimePrint("F.q is not congruent to 1 + 2E (mod 4E). LHS = {}, RHS = {}\n", .{ lhs, rhs });
-            @compileError(str);
+        .Strict => {
+            comptime std.debug.assert(E != null);
+            const e = E.?;
+            comptime std.debug.assert(D % e == 0);
+            const lhs = F.q % (4 * e);
+            const rhs = (1 + 2 * e) % (4 * e);
+            if (lhs != rhs) {
+                const str = std.fmt.comptimePrint("F.q is not congruent to 1 + 2E (mod 4E). F.q % (4 * E) = {}, (1 + 2 * E) % (4 * E) = {}\n", .{ lhs, rhs });
+                @compileError(str);
+            }
         },
     }
 
@@ -528,14 +532,13 @@ test "ring multiplication - kyber round 1 params" {
     const M = ff.Modulus(@bitSizeOf(T));
     const F = PrimeField{ .M = M, .T = T, .q = q };
     const D = 256;
-    const E = 256;
 
     const m = comptime blk: {
         @setEvalBranchQuota(100_000);
         break :blk M.fromPrimitive(T, q) catch unreachable;
     };
     const P = comptime try M.Fe.fromPrimitive(T, m, try findPrimitiveRoot(F, D));
-    const R = CyclotomicRing(.Standard, D, E, F, P);
+    const R = CyclotomicRing(.Standard, D, null, F, P);
 
     var a: [D]T = [_]T{0} ** D;
     var b: [D]T = [_]T{0} ** D;
@@ -549,10 +552,8 @@ test "ring multiplication - kyber round 1 params" {
     const max_fe = m.sub(m.zero, m.one());
     const max = try max_fe.toPrimitive(T);
     for (0..D) |i| {
-        const a_coeff = random.intRangeAtMost(T, 0, max);
-        a[i] = a_coeff;
-        const b_coeff = random.intRangeAtMost(T, 0, max);
-        b[i] = b_coeff;
+        a[i] = random.intRangeAtMost(T, 0, max);
+        b[i] = random.intRangeAtMost(T, 0, max);
     }
 
     const r = R.init();
