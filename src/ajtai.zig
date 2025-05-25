@@ -115,10 +115,10 @@ test "setup and commit" {
     defer commitment.deinit();
 }
 
-const PrimeField = @import("ring.zig").PrimeField;
+const PrimeField = @import("PrimeField.zig");
 const CyclotomicRing = @import("ring.zig").CyclotomicRing;
 const RingModuloCfg = @import("ring.zig").RingModuloCfg;
-const find2NPrimitiveRoot = @import("ring.zig").find2NPrimitiveRoot;
+const find2NPrimitiveRoot = @import("PrimeField.zig").find2NPrimitiveRoot;
 
 const std = @import("std");
 

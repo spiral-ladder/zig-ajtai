@@ -26,7 +26,7 @@ test "ring addition" {
         @setEvalBranchQuota(10_000);
         break :blk M.fromPrimitive(u8, q) catch unreachable;
     };
-    const P = comptime try M.Fe.fromPrimitive(u8, m, try find2NPrimitiveRoot(F, D));
+    const P = comptime try M.Fe.fromPrimitive(u8, m, try F.find2NPrimitiveRoot(D));
     const R = CyclotomicRing(.Strict, D, E, F, P);
 
     {
@@ -98,7 +98,7 @@ test "ring multiplication" {
         @setEvalBranchQuota(10_000);
         break :blk M.fromPrimitive(u8, q) catch unreachable;
     };
-    const P = comptime try M.Fe.fromPrimitive(u8, m, try find2NPrimitiveRoot(F, D));
+    const P = comptime try M.Fe.fromPrimitive(u8, m, try F.find2NPrimitiveRoot(D));
     const R = CyclotomicRing(.Strict, D, E, F, P);
 
     {
@@ -144,7 +144,7 @@ test "ring multiplication - kyber round 1 params" {
         @setEvalBranchQuota(100_000);
         break :blk M.fromPrimitive(T, q) catch unreachable;
     };
-    const P = comptime try M.Fe.fromPrimitive(T, m, try find2NPrimitiveRoot(F, D));
+    const P = comptime try M.Fe.fromPrimitive(T, m, try F.find2NPrimitiveRoot(D));
     const R = CyclotomicRing(.Standard, D, null, F, P);
 
     var a: [D]T = [_]T{0} ** D;
@@ -223,7 +223,7 @@ test "primitive root finding" {
     const q = 17;
     const F = PrimeField{ .M = M, .T = u32, .q = q };
 
-    const root = try find2NPrimitiveRoot(F, D);
+    const root = try F.find2NPrimitiveRoot(D);
 
     const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
     const root_fe = F.M.Fe.fromPrimitive(F.T, m, root) catch unreachable;
@@ -242,10 +242,10 @@ test "primitive root finding" {
 }
 
 const CyclotomicRing = ring.CyclotomicRing;
-const inv = ring.inv;
-const PrimeField = ring.PrimeField;
-const find2NPrimitiveRoot = ring.find2NPrimitiveRoot;
+const inv = PrimeField.inv;
+const find2NPrimitiveRoot = PrimeField.find2NPrimitiveRoot;
 
+const PrimeField = @import("PrimeField.zig");
 const ring = @import("ring.zig");
 
 const std = @import("std");
