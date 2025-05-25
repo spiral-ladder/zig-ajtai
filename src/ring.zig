@@ -30,17 +30,13 @@ pub fn inv(comptime F: PrimeField, a: F.M.Fe) F.M.Fe {
 }
 
 /// Finds a primitive 2n-th root of unity in the field.
+///
 /// A primitive 2n-th root of unity ψ satisfies:
 /// - ψ^n ≡ -1 (mod q)
 /// - ψ^(2n) ≡ 1 (mod q)
 ///
-/// For the CyclotomicRing with params (D, E, q):
-/// - We need q ≡ 1 (mod 2D) or q ≡ 1 + 2E (mod 4E) depending on the configuration
-///
-/// - This guarantees the existence of a 2D-th primitive root of unity
-/// - For efficient implementation, we search for a primitive D-th root of unity
-///   in a way that ensures correct NTT/iNTT operations
-pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
+/// This guarantees the existence of a 2D-th primitive root of unity for efficient NTT/iNTT.
+pub fn find2NPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
     @setEvalBranchQuota(20_000);
     const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
     const d_fe = try F.M.Fe.fromPrimitive(F.T, m, D); // The degree of the polynomial X^D + 1
@@ -54,16 +50,10 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
 
         const element = F.M.Fe.fromPrimitive(F.T, m, candidate) catch unreachable;
 
-        // Compute element^((q-1)/(2n))
-        // This should be a primitive 2n-th root of unity if element is a primitive root
         const possible_root = try m.pow(element, exponent);
-
         // Verify this is indeed a primitive 2n-th root by checking if its n-th power is -1
         const powered = try m.pow(possible_root, d_fe);
-
-        if (powered.eql(neg_one)) {
-            return possible_root.toPrimitive(F.T) catch unreachable;
-        }
+        if (powered.eql(neg_one)) return possible_root.toPrimitive(F.T) catch unreachable;
     }
 
     // If no small candidates work, do an exhaustive search
@@ -72,16 +62,15 @@ pub fn findPrimitiveRoot(comptime F: PrimeField, comptime D: u128) !F.T {
         const element = F.M.Fe.fromPrimitive(F.T, m, candidate) catch unreachable;
 
         const possible_root = try m.pow(element, exponent);
+        // Verify this is indeed a primitive 2n-th root by checking if its n-th power is -1
         const powered = try m.pow(possible_root, d_fe);
-
-        if (powered.eql(neg_one)) {
-            return possible_root.toPrimitive(F.T) catch unreachable;
-        }
+        if (powered.eql(neg_one)) return possible_root.toPrimitive(F.T) catch unreachable;
     }
 
     return error.CannotFindPrimitiveRoot;
 }
 
+/// Configures the compile-time checks that `CyclotomicRing` should do.
 const RingModuloCfg = enum {
     /// Ensures q ≡ 1 (mod 2D).
     Standard,
@@ -413,7 +402,7 @@ test "ring addition" {
         @setEvalBranchQuota(10_000);
         break :blk M.fromPrimitive(u8, q) catch unreachable;
     };
-    const P = comptime try M.Fe.fromPrimitive(u8, m, try findPrimitiveRoot(F, D));
+    const P = comptime try M.Fe.fromPrimitive(u8, m, try find2NPrimitiveRoot(F, D));
     const R = CyclotomicRing(.Strict, D, E, F, P);
 
     {
@@ -485,7 +474,7 @@ test "ring multiplication" {
         @setEvalBranchQuota(10_000);
         break :blk M.fromPrimitive(u8, q) catch unreachable;
     };
-    const P = comptime try M.Fe.fromPrimitive(u8, m, try findPrimitiveRoot(F, D));
+    const P = comptime try M.Fe.fromPrimitive(u8, m, try find2NPrimitiveRoot(F, D));
     const R = CyclotomicRing(.Strict, D, E, F, P);
 
     {
@@ -531,7 +520,7 @@ test "ring multiplication - kyber round 1 params" {
         @setEvalBranchQuota(100_000);
         break :blk M.fromPrimitive(T, q) catch unreachable;
     };
-    const P = comptime try M.Fe.fromPrimitive(T, m, try findPrimitiveRoot(F, D));
+    const P = comptime try M.Fe.fromPrimitive(T, m, try find2NPrimitiveRoot(F, D));
     const R = CyclotomicRing(.Standard, D, null, F, P);
 
     var a: [D]T = [_]T{0} ** D;
@@ -607,7 +596,7 @@ test "primitive root finding" {
     const q = 17;
     const F = PrimeField{ .M = M, .T = u32, .q = q };
 
-    const root = try findPrimitiveRoot(F, D);
+    const root = try find2NPrimitiveRoot(F, D);
 
     const m = F.M.fromPrimitive(F.T, F.q) catch unreachable;
     const root_fe = F.M.Fe.fromPrimitive(F.T, m, root) catch unreachable;

@@ -91,7 +91,7 @@ test "setup and commit" {
         @setEvalBranchQuota(100_000);
         break :blk F.M.fromPrimitive(T, q) catch unreachable;
     };
-    const P = comptime try F.M.Fe.fromPrimitive(T, m, try findPrimitiveRoot(F, D));
+    const P = comptime try F.M.Fe.fromPrimitive(T, m, try find2NPrimitiveRoot(F, D));
     const Ring = CyclotomicRing(.Standard, D, E, F, P);
     const ring = Ring.init();
 
@@ -118,7 +118,7 @@ test "setup and commit" {
 const PrimeField = @import("ring.zig").PrimeField;
 const CyclotomicRing = @import("ring.zig").CyclotomicRing;
 const RingModuloCfg = @import("ring.zig").RingModuloCfg;
-const findPrimitiveRoot = @import("ring.zig").findPrimitiveRoot;
+const find2NPrimitiveRoot = @import("ring.zig").find2NPrimitiveRoot;
 
 const std = @import("std");
 
