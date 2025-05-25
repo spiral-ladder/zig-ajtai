@@ -1,3 +1,5 @@
+//! Contains the implementation of the Ajtai commitment scheme.
+
 pub fn Ajtai(
     Ring: type,
     K: comptime_int,

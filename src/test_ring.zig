@@ -1,4 +1,4 @@
-//! Contains tests for `CyclotomicRing` and other operations.
+//! Contains tests for `CyclotomicRing`.
 
 fn test_ring_addition(
     comptime F: PrimeField,

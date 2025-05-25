@@ -1,3 +1,7 @@
+//! Contains implementation of the prime field that is used within the ring elements of `CyclotomicRing`.
+//!
+//! This file also contains useful implementation of field operations to allow for NTTs/iNTTs.
+
 const PrimeField = @This();
 
 /// The `std.crypto.ff.Modulus` type.

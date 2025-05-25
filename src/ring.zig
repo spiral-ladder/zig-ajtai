@@ -1,3 +1,10 @@
+//! Contains implementation of a cyclotomic ring defining elements of the ring Z_q[X]/(X^D + 1).
+//!
+//! All operations done within the ring are performed modulo a prime q and the cyclotomic polynomial X^D + 1.
+//!
+//! NTT/iNTT is used by default for the multiplication of ring elements, with a naive schoolbook multiplication
+//! implemented as well for completeness.
+
 /// Configures the compile-time checks that `CyclotomicRing` should do.
 const RingModuloCfg = enum {
     /// Ensures q ≡ 1 (mod 2D).
